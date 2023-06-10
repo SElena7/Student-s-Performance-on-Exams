@@ -1,0 +1,525 @@
+---
+title: "Students performance"
+author: "Elena Spirova"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+link-citations: yes
+
+#bibliography: bibliography.bib
+---
+
+
+# 1. Introduction
+Student results on exams are a reflection of their hard work, dedication, and the knowledge they have acquired. Exams provide an opportunity for students to demonstrate their understanding of the subject matter, apply critical thinking skills, and showcase their academic achievements.
+
+Exam results can vary from student to student, as each individual possesses unique strengths, learning styles, and levels of preparation. Some students may excel and achieve high scores, indicating a deep understanding of the material and mastery of the concepts. On the other hand, some students may face challenges and receive lower scores. 
+
+With this project our aim will be to find out what are the patterns of successful and unsuccessful students and what they depend on.
+
+We will use the *"Student Performance in exams dataset"* provided from keegle for this study.
+
+# 2. Presentation and Description of the Problem
+
+## Student Performance In Exams
+
+This data set consists of the marks secured by the students in various subjects.
+All of the information in this dataset is fictional.
+
+We would like to see how the variables from our data set correlate with one another. For example, we will show how *parental level of education* correlates with the performance of the students in exams, by seeing how it effects the performance of students in their math, reading and writing exam . The most important correlation we will look for is how the 5 independent variables correlate with performance of students on the average *grades* of the three different exams - the dependent variable of the data set. We will also see the gender distribution of the exam results.
+
+At the end we will try to draw a conclusion and see which independent variables have the most effect. 
+
+First we’ll be loading the libraries that we will use for the analysis:
+
+
+```{r setup, include=FALSE} 
+
+knitr::opts_chunk$set(warning = FALSE, message=FALSE)
+library(tidyverse) 
+library(dplyr)     
+library(ggplot2)   
+library(ggpubr)      # ggarrange()
+library(DT)          # datatable()
+library(mlr)         # summarizeColumns()
+library(naniar)      # finding paterns within missing values in data, visualization
+library(knitr)       # dynamic report generation
+
+```
+
+Our next step will be loading the data.
+
+```{r warnings: False}
+csv_dir <- paste0(getwd(), "/archive")
+data <- read.csv(paste0(csv_dir, "/StudentsPerformance.csv"))
+```
+
+
+# 3. Presentation of the Data
+
+## The Dataset:
+
+```{r}
+datatable(data, rownames = F, filter = "top", caption = "Student Performance on Exams", options = list(searching = F, pageLength = 5, lengthMenu = c(5, 10), scrollX = T,  autoWidth = T))
+
+```
+
+## Content Description
+
+The data contains 8 columns and 1000 rows (entries of data).
+
+```{r }
+
+print(colnames(data))
+print(paste("Entires number:", dim(data)[1]))
+ 
+```
+
+### Meaning of the variables:
+- Gender : The gender of the student, two values possible (male/female)
+- Race ethnicity : These will just be denoted as group A, B, C, D, E.
+- Parental level of education : the there are 6 options 
+   - Bachelor's degree
+   - Some college
+   - Master's degree
+   - Associate's degree
+   - High school
+   - Some high school
+- Lunch : contains information as to whether the lunch of the student was free/reduced price, or he/she had to pay standard for it.
+- Test preparation course : contains values as to whether the student completed the preparation course or did not attend one.
+- Math score : how many points the student has obtained on his/hers math exam (0-100)
+- Reading score : how many points the student has obtained on his/hers reading exam (0-100)
+- Writing score : how many points the student has obtained on his/hers writing exam (0-100)
+
+
+## Overview of the Data
+
+### Data-type Info
+
+Using the ```str() ``` to display the internal structure of the data set.
+
+```{r } 
+str(data)
+```
+### Summarization
+Using the ```summary()``` function we do statistical analysis on our data.
+
+```{r}
+summary(data)
+```
+
+#### Observation of the summary
+
+
+```{r}
+summarizeColumns(data) %>% 
+  datatable(., 
+            class = "stripe hover row-border order-column", 
+            options = list(pageLength = 12,
+                           scrollX = T), 
+            autoHideNavigation = T) 
+
+
+```
+
+From observing this we can conclude that the students did the worst on their math exam since their average grades for it are the smallest and the minimum value is also the smallest. 
+
+We can also say that the best results were on their reading exam. 
+Not much can be said about other values since they are not numeric.
+
+```{r}
+vis_miss(data)
+
+```
+
+```{r}
+sum(is.na(data))
+```
+
+
+As we can see we have no missing values and therefore there is no visualization of their patterns.
+
+
+
+# 4. Data preparation
+
+For the sake of our research we will create and add three new columns.
+
+1. First of all let's set the passmark for every exam to be 50.
+
+```{r}
+ passmark = 50
+```
+
+2. Now let's add columns named "Percentage", "Grade" and "Qualification" :
+
+```{r}
+
+data <- data %>% mutate( Percentage = c ( Percentage = ( .$math.score + .$writing.score + .$reading.score ) / 3))
+
+data <- data %>% mutate( Grade = c (Grade = case_when(
+  Percentage == 100 ~ "O",
+  Percentage >= 90 ~ "A",
+  Percentage >= 80 ~ "B",
+  Percentage >= 70 ~ "C",
+  Percentage >= 60 ~ "D",
+  Percentage >= 50 ~ "E",
+  TRUE ~ "F"
+  
+)))
+
+
+data <- data %>% mutate(Qualification = c (Qualification = case_when(
+  Grade == "O" ~ "Outstanding",
+  Grade == "A" ~ "Excellent",
+  Grade == "B" ~ "Very Good",
+  Grade == "C" ~ "Good",
+  Grade == "D" ~ "Sufficient",
+  Grade == "E" ~ "Pass",
+  TRUE ~ "Fail"
+  
+)))
+
+
+ datatable(data, 
+            class = "stripe hover row-border order-column", 
+            options = list(pageLength = 12,
+                           scrollX = T), 
+            autoHideNavigation = T)
+```
+
+
+# 5. Exploratory Data Analysis and Visulisation 
+
+Now we will start visualizing our data:
+
+## Number of boys vs. number of girls
+1. We will find out the percentage of male and female students taking the exam.
+
+```{r}
+
+data %>% 
+  ggplot(aes( x = gender ))+
+  geom_bar(fill = "steelblue", color = "black")+
+  labs(x = "Gender", y = "Count", title = "Distribution of gender") +
+  scale_y_continuous(labels = scales::percent_format())
+
+
+percentage_diff<-data %>% summarize(girls_percentage = sum(gender == "female") / n()) %>%
+  mutate( boys_percentage = 1 - girls_percentage )%>%
+  mutate( diff_percentage = girls_percentage - boys_percentage )
+gender_diff<-percentage_diff$diff_percentage*100
+
+```
+So, now we can see that there are more girls in this dataset and that they beat boys in number by `r gender_diff` % .
+
+## Gender vs. Grades
+
+```{r }
+options(repr.plot.width = 10, repr.plot.height =5)
+
+theme_set(theme_minimal())
+colors <- c("male" = "lightblue", "female" = "pink")
+
+ggplot(data, aes(x = Grade, fill = gender, order = Grade))+
+  geom_bar()+
+  labs(x = "GRADE", y = "COUNT", title = "Gender vs Grades") +
+  scale_fill_manual(values = colors) +
+  theme(legend.position = "top", legend.title = element_blank()) +
+  guides(fill = guide_legend(title = "Gender")) +
+  coord_flip()
+```
+
+From this visualization we can infer that: 
+- The majority of students who got "outstanding" results were female.
+- Majority of students got grade C, followed by D, followed by E, followed by F, followed by A and a very small percent is outstanding.
+- More female students got an A, B, C.
+- More boys got E
+- A similar number of them got E.
+
+With this we can confirm that gender is in fact a factor in whether pupils are successful in exams. 
+
+
+## Observing the scores for each of the exams
+
+```{r }
+
+data %>%
+  count(writing.score) %>%
+  ggplot(aes(x = writing.score, y = n, fill = n)) +
+  geom_col() +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") 
+```
+
+
+Let us observe the writing score first.
+
+How many students passed their writing exam?
+```{r}
+df <- data %>%
+  mutate(Writing_PassStatus = ifelse(writing.score < passmark, "F", "P"))
+
+df %>%
+  count(Writing_PassStatus)
+
+```
+
+We will now see how the parental education effects this exam.
+
+```{r}
+
+df %>%
+  ggplot(aes(x = parental.level.of.education, fill = Writing_PassStatus)) +
+  geom_bar(position = "fill", color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+```
+
+As, we can see the best results are held by those students whose parent(s) have a master's degree, whereas the worst are of those students whose parents went to high school, or some high school.
+
+
+
+
+Now, let's observe reading score: 
+
+
+```{r}
+
+data %>%
+  count(reading.score) %>%
+  ggplot(aes(x = reading.score, y = n, fill = n)) +
+  geom_col() +
+  scale_fill_gradient(low = "grey", high = "black") 
+```
+
+As we can see the amount of students who passed the writing and the reading exam is about the same.
+
+
+```{r}
+
+df <- df %>% 
+  mutate (Reading_PassStatus = c(ifelse(reading.score >= passmark, "P","F") ))
+df %>% count(Reading_PassStatus)
+
+```
+
+```{r}
+
+df %>%
+  ggplot(aes(x = parental.level.of.education, fill = Reading_PassStatus)) +
+  geom_bar(position = "fill", color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+The best results are held by students whose parents have a master's degree and the worst are again in high school, or some high school, so no significant changes.
+
+
+And finally, let's observe math:
+
+
+```{r }
+data %>%
+  count(math.score)%>%
+  ggplot(aes(x = math.score, y = n, fill = n)) +
+  geom_col()+
+  scale_fill_gradient(low = "lightgreen", high = "darkgreen")
+
+```
+By far math seems to have the lowest pass status.
+
+How many students passed math?
+
+```{r}
+
+df <-  df %>% mutate( Math_PassStatus = c(ifelse( math.score < passmark , "F" , "P" )) )
+
+df %>% count(df$Math_PassStatus)
+
+
+```
+
+Observation: 
+- Reading has the highest pass status.
+- Math has the lowest pass status.
+
+
+
+
+```{r}
+
+df %>%
+  ggplot(aes(x = parental.level.of.education, fill = Math_PassStatus)) +
+  geom_bar(position = "fill", color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+## Gender Distribution
+
+We will take the exam with the best pass status and the worst pass status and analyse it when it comes to gender density.
+
+
+```{r}
+library(ggplot2)
+library(ggjoy)
+
+# Set theme and options
+theme_set(theme_minimal())
+options(repr.plot.width = 30, repr.plot.height = 25)
+
+# Create the jointplot
+ggplot(data, aes(x = math.score, y = reading.score, color = gender)) +
+  geom_density_2d() +
+  labs(x = "Math Score", y = "Reading Score", title = "Reading and Mathematics score vs Gender") +
+  theme(plot.title = element_text(size = 15, face = "bold")) +
+  guides(fill = guide_legend(title = "Gender")) +
+  scale_fill_manual(values = c("Male" = "blue", "Female" = "red"))
+
+
+
+```
+
+
+By this we can see that boys and girls overlap at 70 points for both reading and maths. Bigger number of boys stays between the interval (40,90)
+and girls are a bit denser for math scores. 
+
+When it comes to reading we see that girls performed generally better.
+
+
+```{r}
+library(ggplot2)
+
+# Set theme and options
+theme_set(theme_minimal())
+options(repr.plot.width = 8, repr.plot.height = 6)
+
+# Create the joint plot
+data %>%
+  ggplot() +
+  geom_density(aes(x = writing.score, fill = gender), alpha = 0.5) +
+  geom_density(aes(x = math.score, fill = gender), alpha = 0.5) +
+  labs(x = "Score", y = "Density", title = "Writing and Math Score Distributions") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 15, face = "bold")) +
+  guides(fill = guide_legend(title = "Gender")) +
+  facet_grid(gender ~ ., scales = "free")
+```
+
+
+## Observing variables on Grade
+
+
+Let's observe the average results of the students:
+
+```{r}
+
+data %>%
+  count(Percentage) %>%
+  ggplot(aes(x = Percentage, y = n, fill = n)) +
+  geom_col() +
+  scale_fill_gradient(low = "lavender", high = "purple") 
+
+
+
+```
+
+And the grades:
+
+```{r}
+df %>%
+  ggplot(aes(x = Grade, fill = Grade)) +
+  geom_bar() +
+  scale_x_discrete(limits = c('A', 'B', 'C', 'D', 'E', 'F')) +
+  labs(x = "Grade", y = "Count", title = "Grade Count Plot") +
+  theme_minimal()
+```
+As we can see, most of the students got C and D and the minority grade is A.
+
+```{r}
+
+df %>%
+  ggplot(aes(x = parental.level.of.education, fill = Grade)) +
+  geom_bar(position = "fill", color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+```{r}
+
+df %>%
+  ggplot(aes(x = lunch, fill = Grade)) +
+  geom_bar(position = "fill", color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+```{r}
+
+df %>%
+  ggplot(aes(x = parental.level.of.education, fill = Grade)) +
+  geom_bar(position = "stack", color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+
+```{r}
+
+df %>%
+  ggplot(aes(x = race.ethnicity, fill = Grade)) +
+  geom_bar(position = "dodge", color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+```
+```{r}
+data %>% count(race.ethnicity)
+```
+
+```{r}
+
+df %>%
+  ggplot(aes(x = test.preparation.course, fill = Grade)) +
+  geom_bar(position = "fill", color = "black") +
+  scale_fill_brewer(palette = "Set1") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+
+## Conclusion
+
+
+
+  We arrive to the conclusion that females have a more successful pass status out of the students in the dataset and they are also among the students that have exceptional results.
+  Another conclusion is that parental education is a factor, as the more the parent is educated (master's degree), the more the child is probable to be educated, so they are in a positive linear relationship.
+  Conclusion number three would be that students who have a standard lunch tend to have better results. Conclusion number four is out of all the ethnicities, group E had the students with the outstanding results and also the students with the least fails. Group C was the one with the most of all of the grades, which would be connected to the fact that most of the students belong to group C.
+  And lastly we conclude that even if both groups who had a preparatory course and groups who didn't have a course have exceptional students, the first group had less fails and more As, Bs and Cs, so attending a course definitely helps a student pass.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
